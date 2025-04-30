@@ -189,4 +189,5 @@ Cleans up raw website text data, removing common HTML artifacts and excess white
 
 ## License
 
-[Specify your license here, e.g., MIT, Apache 2.0, etc.]
+This project is licensed under the Apache License, Version 2.0.
+See the [LICENSE](LICENSE) file for details.

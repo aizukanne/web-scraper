@@ -1,23 +1,11 @@
 import aiohttp
 import asyncio
-import base64
 import boto3
-import calendar
-import concurrent.futures
-import csv
 import datetime
 import json
 import logging
 import mimetypes
-import nltk
-import openpyxl
-import os
 import random
-import re
-import requests
-import tempfile
-import textwrap
-import time
 
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin
@@ -64,6 +52,29 @@ def upload_document_to_s3(document_content, content_type, document_url):
     # Construct the S3 URL  
     s3_url = f"https://{docs_bucket_name}.s3.amazonaws.com/{s3_object_name}"
     return s3_url
+
+async def fetch_page(session, url, timeout=30):
+    headers = {
+        'User-Agent': random.choice(USER_AGENTS)
+    }    
+    try:
+        async with session.get(url, headers=headers, timeout=timeout) as response:
+            #print(f"Search Result: {response}")
+            content_type = response.headers.get('Content-Type', '')
+            if 'text' in content_type:
+                encoding = response.charset or 'utf-8'
+                return await response.text(encoding=encoding)
+            elif 'application/pdf' in content_type or 'application/msword' in content_type or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' in content_type:
+                return await response.read(), content_type
+            else:
+                return None, content_type
+    except asyncio.TimeoutError:
+        print(f"Timeout error: {url} took too long to respond.")
+        return f"Timeout error: {url} took too long to respond.", None
+    except ClientConnectorSSLError:
+        print(f"SSL handshake error: Failed to connect to {url}")
+        return f"SSL handshake error: Failed to connect to {url}", None 
+
 
 async def process_page(session, url, semaphore, full_text=False):
     async with semaphore:
@@ -198,29 +209,6 @@ async def process_page(session, url, semaphore, full_text=False):
             })
 
         return response_list
-
-
-async def fetch_page(session, url, timeout=30):
-    headers = {
-        'User-Agent': random.choice(USER_AGENTS)
-    }    
-    try:
-        async with session.get(url, headers=headers, timeout=timeout) as response:
-            #print(f"Search Result: {response}")
-            content_type = response.headers.get('Content-Type', '')
-            if 'text' in content_type:
-                encoding = response.charset or 'utf-8'
-                return await response.text(encoding=encoding)
-            elif 'application/pdf' in content_type or 'application/msword' in content_type or 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' in content_type:
-                return await response.read(), content_type
-            else:
-                return None, content_type
-    except asyncio.TimeoutError:
-        print(f"Timeout error: {url} took too long to respond.")
-        return f"Timeout error: {url} took too long to respond.", None
-    except ClientConnectorSSLError:
-        print(f"SSL handshake error: Failed to connect to {url}")
-        return f"SSL handshake error: Failed to connect to {url}", None 
 
 
 async def get_web_pages(urls, full_text=False, max_concurrent_requests=5):
